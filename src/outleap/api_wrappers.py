@@ -778,6 +778,7 @@ class LLAppearanceAPI(LEAPAPIWrapper):
 
 class LLInventoryAPI(LEAPAPIWrapper):
     PUMP_NAME = "LLInventory"
+    MAX_UI_STATE_ROWS = 100
 
     FILTER_LINKS_TYPE = Literal[
         "INCLUDE_LINKS",
@@ -843,6 +844,62 @@ class LLInventoryAPI(LEAPAPIWrapper):
             payload["filter_links"] = filter_links
         fut = self._client.command(self._pump_name, "collectDescendantsIf", payload)
         return _response_handler(fut)
+
+    def get_ui_state(self, max_rows: int = MAX_UI_STATE_ROWS) -> Awaitable[Dict]:
+        """Return the bounded state and visible rows of the active inventory panel."""
+        if not 1 <= max_rows <= self.MAX_UI_STATE_ROWS:
+            raise ValueError(f"max_rows must be between 1 and {self.MAX_UI_STATE_ROWS}")
+        return _response_handler(
+            self._client.command(self._pump_name, "getUIState", {"max_rows": max_rows})
+        )
+
+    def expand_folder(self, folder_id: uuid.UUID) -> Awaitable[Dict]:
+        """Expand a folder in the active inventory panel."""
+        return _response_handler(
+            self._client.command(self._pump_name, "expandFolder", {"folder_id": folder_id})
+        )
+
+    def collapse_folder(self, folder_id: uuid.UUID) -> Awaitable[Dict]:
+        """Collapse a folder in the active inventory panel."""
+        return _response_handler(
+            self._client.command(self._pump_name, "collapseFolder", {"folder_id": folder_id})
+        )
+
+    def select_object(self, object_id: uuid.UUID) -> Awaitable[Dict]:
+        """Select an inventory object in the active inventory panel."""
+        return _response_handler(
+            self._client.command(self._pump_name, "selectObject", {"object_id": object_id})
+        )
+
+    def set_filter(self, filter_text: str) -> Awaitable[Dict]:
+        """Set the active inventory panel filter text."""
+        return _response_handler(
+            self._client.command(self._pump_name, "setFilter", {"filter": filter_text})
+        )
+
+    def set_sort(self, sort_order: int) -> Awaitable[Dict]:
+        """Set the active inventory panel sort order."""
+        return _response_handler(
+            self._client.command(self._pump_name, "setSort", {"sort_order": sort_order})
+        )
+
+    def set_view_mode(self, view_mode: str) -> Awaitable[Dict]:
+        """Set the active inventory panel view mode."""
+        return _response_handler(
+            self._client.command(self._pump_name, "setViewMode", {"view_mode": view_mode})
+        )
+
+    def get_context_actions(self, object_id: uuid.UUID) -> Awaitable[Dict]:
+        """Return context action availability for an inventory object."""
+        return _response_handler(
+            self._client.command(self._pump_name, "getContextActions", {"object_id": object_id})
+        )
+
+    def resolve_link(self, object_id: uuid.UUID) -> Awaitable[Dict]:
+        """Resolve an inventory link without changing viewer state."""
+        return _response_handler(
+            self._client.command(self._pump_name, "resolveLink", {"object_id": object_id})
+        )
 
 
 class LLStatsAPI(LEAPAPIWrapper):

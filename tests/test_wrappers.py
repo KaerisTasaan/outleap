@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 
 import outleap
 
@@ -248,3 +249,58 @@ class TestWrappers(BaseClientTest):
         )
         with self.assertRaises(ValueError):
             await fut
+
+    async def test_inventory_ui_state_wrapper(self):
+        self._write_welcome()
+        await self.client.connect()
+
+        inventory_api = outleap.LLInventoryAPI(self.client)
+        folder_id = uuid.uuid4()
+        fut = inventory_api.get_ui_state(25)
+        self.assertDictEqual(
+            {
+                "pump": "LLInventory",
+                "data": {
+                    "max_rows": 25,
+                    "op": "getUIState",
+                    "reply": "reply_pump",
+                    "reqid": 1,
+                },
+            },
+            self.protocol.sent_messages[-1],
+        )
+        self.protocol.inbound_messages.put_nowait(
+            {"pump": "reply_pump", "data": {"ui_state_version": 4, "reqid": 1}}
+        )
+        self.assertEqual({"ui_state_version": 4}, await fut)
+
+        fut = inventory_api.expand_folder(folder_id)
+        self.assertEqual(folder_id, self.protocol.sent_messages[-1]["data"]["folder_id"])
+        self.protocol.inbound_messages.put_nowait(
+            {"pump": "reply_pump", "data": {"expanded": True, "reqid": 2}}
+        )
+        self.assertEqual({"expanded": True}, await fut)
+
+        with self.assertRaises(ValueError):
+            inventory_api.get_ui_state(0)
+
+    async def test_inventory_context_and_link_wrappers(self):
+        self._write_welcome()
+        await self.client.connect()
+
+        inventory_api = outleap.LLInventoryAPI(self.client)
+        object_id = uuid.uuid4()
+
+        fut = inventory_api.get_context_actions(object_id)
+        self.assertEqual("getContextActions", self.protocol.sent_messages[-1]["data"]["op"])
+        self.protocol.inbound_messages.put_nowait(
+            {"pump": "reply_pump", "data": {"actions": [], "reqid": 1}}
+        )
+        self.assertEqual({"actions": []}, await fut)
+
+        fut = inventory_api.resolve_link(object_id)
+        self.assertEqual("resolveLink", self.protocol.sent_messages[-1]["data"]["op"])
+        self.protocol.inbound_messages.put_nowait(
+            {"pump": "reply_pump", "data": {"status": "resolved", "reqid": 2}}
+        )
+        self.assertEqual({"status": "resolved"}, await fut)
