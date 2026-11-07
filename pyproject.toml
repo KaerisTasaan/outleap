@@ -43,6 +43,7 @@ tools = [
 outleap-agent = "outleap.scripts.agent:agent_main"
 outleap-repl = "outleap.scripts.repl:repl_main"
 outleap-inspector = "outleap.scripts.inspector:inspector_main"
+firestorm-inventory-mcp = "outleap.inventory_mcp:main"
 
 
 [build-system]
