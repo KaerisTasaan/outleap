@@ -70,22 +70,24 @@ class InventoryMCPServer:
         self._leap_client: Optional[LEAPClient] = None
 
     async def start(self) -> None:
-        await asyncio.gather(self._serve_leap(), self._serve_mcp())
-
-    async def _serve_leap(self) -> None:
-        async def accept(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        server = await asyncio.start_server(self._accept_leap, self._leap_host, self._leap_port)
+        try:
+            await self._serve_mcp()
+        finally:
+            server.close()
+            await server.wait_closed()
             if self._leap_client is not None:
-                writer.close()
-                await writer.wait_closed()
-                return
-            self._leap_client = LEAPClient(LEAPProtocol(reader, writer))
-            await self._leap_client.connect()
-            self._inventory = LLInventoryAPI(self._leap_client)
-            self._leap_ready.set()
+                self._leap_client.disconnect()
 
-        server = await asyncio.start_server(accept, self._leap_host, self._leap_port)
-        async with server:
-            await server.serve_forever()
+    async def _accept_leap(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        if self._leap_client is not None:
+            writer.close()
+            await writer.wait_closed()
+            return
+        self._leap_client = LEAPClient(LEAPProtocol(reader, writer))
+        await self._leap_client.connect()
+        self._inventory = LLInventoryAPI(self._leap_client)
+        self._leap_ready.set()
 
     async def _serve_mcp(self) -> None:
         while True:
@@ -142,7 +144,7 @@ class InventoryMCPServer:
         }
 
     async def _call_tool(self, name: str, args: Dict[str, Any]) -> Dict[str, Any]:
-        await self._leap_ready.wait()
+        await asyncio.wait_for(self._leap_ready.wait(), timeout=10)
         if self._inventory is None:
             raise RuntimeError("LEAP is unavailable")
         calls: dict[str, Callable[[], Awaitable[dict[str, Any]]]] = {
